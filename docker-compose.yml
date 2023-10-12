@@ -1,0 +1,188 @@
+version: "3.4"
+services:
+  producer:
+    image: openjdk:11.0.16-jre-slim
+    container_name: producer
+    tty: true
+    stdin_open: true
+    volumes:
+      - type: bind
+        source: "./producer/target/scala-2.12/"
+        target: "/app/"
+      - type: bind
+        source: "./extra-jars/opentelemetry-javaagent.jar"
+        target: "/tmp/opentelemetry-javaagent.jar"
+    environment:
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14250
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_SERVICE_NAME=producer.service
+      - OTEL_ATTRIBUTE_COUNT_LIMIT=128
+      - OTEL_PROPAGATORS=tracecontext,baggage
+      - OTEL_JAVAAGENT_DEBUG=false
+      - OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED=false
+
+  broker:
+    image: confluentinc/cp-kafka:5.5.1
+    hostname: broker
+    container_name: broker
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+      - 29092:29092
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:32181
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://broker:29092,PLAINTEXT_HOST://broker:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - CONFLUENT_SUPPORT_METRICS_ENABLE=false
+
+  init-broker:
+    image: confluentinc/cp-kafka:5.5.1
+    container_name: init-broker
+    depends_on:
+      - broker
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: |
+      "
+      kafka-topics --bootstrap-server broker:9092 --create \\
+        --topic sample-topic --replication-factor 1 --partitions 2
+      kafka-topics --bootstrap-server broker:9092 --list
+      "
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:5.5.1
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - 32181:32181
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=32181
+      - ZOOKEEPER_TICK_TIME=2000
+
+  sparkmaster:
+    image: apache/spark:3.4.0-scala2.12-java11-ubuntu
+    volumes:
+      - type: bind
+        source: "./spark-consumer/target/scala-2.12/"
+        target: "/app/"
+      - type: bind
+        source: "./extra-jars/opentelemetry-javaagent.jar"
+        target: "/tmp/opentelemetry-javaagent.jar"
+    hostname: spakrmaster
+    container_name: sparkmaster
+    # with javaagent, cluster mode
+    command: bash -c "/opt/spark/sbin/start-master.sh --host 0.0.0.0 && \
+        /opt/spark/bin/spark-submit \
+           --master spark://sparkmaster:7077 \
+           --conf 'spark.driver.extraJavaOptions=-javaagent:/tmp/opentelemetry-javaagent.jar' \
+           --conf 'spark.executor.extraJavaOptions=-javaagent:/tmp/opentelemetry-javaagent.jar' \
+           /app/ConsumerApp.jar"
+    depends_on:
+      - init-broker
+    environment:
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14250
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_SERVICE_NAME=spark-consumer.service
+      - OTEL_ATTRIBUTE_COUNT_LIMIT=128
+      - OTEL_PROPAGATORS=tracecontext,baggage
+      - OTEL_JAVAAGENT_DEBUG=false
+      - OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED=false
+    ports:
+      - 30080:8080
+      - 4040:4040
+
+  sparkworker1:
+    image: apache/spark:3.4.0-scala2.12-java11-ubuntu
+    hostname: spakrworker1
+    container_name: sparkworker1
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://sparkmaster:7077 --host 0.0.0.0
+    depends_on:
+      - sparkmaster
+    ports:
+      - 10081:8081
+    environment:
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14250
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_SERVICE_NAME=spark-consumer.service
+      - OTEL_ATTRIBUTE_COUNT_LIMIT=128
+      - OTEL_PROPAGATORS=tracecontext,baggage
+      - OTEL_JAVAAGENT_DEBUG=false
+      - OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED=false
+    volumes:
+      - type: bind
+        source: "./extra-jars/opentelemetry-javaagent.jar"
+        target: "/tmp/opentelemetry-javaagent.jar"
+
+  sparkworker2:
+    image: apache/spark:3.4.0-scala2.12-java11-ubuntu
+    hostname: spakrworker2
+    container_name: sparkworker2
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://sparkmaster:7077 --host 0.0.0.0
+    depends_on:
+      - sparkmaster
+    ports:
+      - 20081:8081
+    environment:
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14250
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_SERVICE_NAME=spark-consumer.service
+      - OTEL_ATTRIBUTE_COUNT_LIMIT=128
+      - OTEL_PROPAGATORS=tracecontext,baggage
+      - OTEL_JAVAAGENT_DEBUG=false
+      - OTEL_INSTRUMENTATION_MESSAGING_EXPERIMENTAL_RECEIVE_TELEMETRY_ENABLED=false
+    volumes:
+      - type: bind
+        source: "./extra-jars/opentelemetry-javaagent.jar"
+        target: "/tmp/opentelemetry-javaagent.jar"
+
+  nginx:
+    image: opentracing/nginx-opentracing:latest
+    container_name: nginx
+    volumes:
+      - type: bind
+        source: "./nginx/nginx.conf"
+        target: "/etc/nginx/nginx.conf"
+      - type: bind
+        source: "./nginx/jaeger-config.json"
+        target: "/etc/jaeger-config.json"
+    ports:
+      - 8000:80
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.49
+    container_name: jaeger
+    environment:
+      - SPAN_STORAGE_TYPE=memory
+    ports:
+      # accept OpenTelemetry Protocol (OTLP) over gRPC
+      - 4317:4317
+      # accept model.proto
+      - 14250:14250
+      # serve frontend
+      - 16686:16686
+
+
+networks:
+  default:
+    name: poc-net
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24
