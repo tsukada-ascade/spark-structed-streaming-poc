@@ -1,6 +1,6 @@
 # Spark-structed-streaming-poc
 
-This is a repro program for (issue#9638)[https://github.com/open-telemetry/opentelemetry-java-instrumentation/issues/9638].
+This is a repro program for [issue#9638](https://github.com/open-telemetry/opentelemetry-java-instrumentation/issues/9638).
 
 ## Summary
 
@@ -41,7 +41,7 @@ And, since will be using the docker CLI, expected that add user to docker group.
 ```
   $ sudo gpasswd -a <user> docker
 ```
-(After adding a user to docker group, it may need to logout once.)
+After adding a user to docker group, it may need to logout once.
 
 ## Steps to reproduce
 
@@ -54,7 +54,7 @@ And, since will be using the docker CLI, expected that add user to docker group.
 If the build complete successfully, it will generate two jars shown below.
 ```
 producer/target/scala-2.12/ProducerApp.jar
-spark-consumer/target/scala-2.12/SampleApp.jar
+spark-consumer/target/scala-2.12/ConsumerApp.jar
 ```
 
 ### Start containers
@@ -88,12 +88,12 @@ It is normal if the log shown below is output every 10 seconds.
 ### Produce some data
 
 ```
- $ docker exec -it producer bash
- $ java -javaagent:/tmp/opentelemetry-javaagent.jar -jar /app/ProducerApp.jar
- ...
- [main] INFO org.apache.kafka.common.metrics.Metrics - Metrics reporters closed
- [main] INFO org.apache.kafka.common.utils.AppInfoParser - App info kafka.producer for producer-1 unregistered
- produced.
+  $ docker exec -it producer bash
+  root@0588c6083499:/# java -javaagent:/tmp/opentelemetry-javaagent.jar -jar /app/ProducerApp.jar
+  ...
+  [main] INFO org.apache.kafka.common.metrics.Metrics - Metrics reporters closed
+  [main] INFO org.apache.kafka.common.utils.AppInfoParser - App info kafka.producer for producer-1 unregistered
+  produced.
 ```
 
 ### Confirm recorded span from jaeger UI
@@ -105,3 +105,9 @@ http://<your ip>:16686
 ```
 
 Probably, the span of the Consumer receive operation from kafka is not recorded in jaeger.
+
+### Exit containers
+
+```
+  $ make down
+```
