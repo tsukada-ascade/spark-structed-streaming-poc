@@ -1,6 +1,6 @@
 # Spark-structed-streaming-poc
 
-This is a repro program for [issue#9638](https://github.com/open-telemetry/opentelemetry-java-instrumentation/issues/9638).
+This is a small system for reproducing [issue#9638](https://github.com/open-telemetry/opentelemetry-java-instrumentation/issues/9638). Spark structed streaming part is written by Scala.
 
 ## Summary
 
@@ -41,7 +41,7 @@ And, since will be using the docker CLI, expected that add user to docker group.
 ```
   $ sudo gpasswd -a <user> docker
 ```
-After adding a user to docker group, it may need to logout once.
+After adding a user to docker group, the user may need to logout once.
 
 ## Steps to reproduce
 
@@ -77,7 +77,7 @@ spark-consumer/target/scala-2.12/ConsumerApp.jar
 
 ### Confirm spark batch execution is started
 
-It is normal if the log shown below is output every 10 seconds.
+The logs shown below is output every 10 seconds.
 
 ```
   $ docker logs sparkmaster -f
@@ -90,6 +90,10 @@ It is normal if the log shown below is output every 10 seconds.
 ```
   $ docker exec -it producer bash
   root@0588c6083499:/# java -javaagent:/tmp/opentelemetry-javaagent.jar -jar /app/ProducerApp.jar
+```
+
+If the produce successfully, logs shown below(`produced` is outputed):
+```
   ...
   [main] INFO org.apache.kafka.common.metrics.Metrics - Metrics reporters closed
   [main] INFO org.apache.kafka.common.utils.AppInfoParser - App info kafka.producer for producer-1 unregistered
@@ -104,7 +108,12 @@ Jaeger frontend is running on port 16686. Please access.
 http://<your ip>:16686
 ```
 
-Probably, the span of the Consumer receive operation from kafka is not recorded in jaeger.
+Probably, the span of the consumer receive operation from kafka is not recorded in jaeger.
+
+  1. `producer.service sample-topic publish`
+  2. Span of receive operation is not recorded
+  3. `spark-consumer.service GET`
+  4. `nginx-opentracing.service nginx-opentracing`
 
 ### Exit containers
 
