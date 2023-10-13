@@ -26,22 +26,22 @@ Then, expected that the span shown below will be recorded.
   - c. span of http GET(spark part)
   - d. span of nginx
 
-Actually, when run this repro, a, c, and d are recorded, but b is not recorded.
+Actually, a, c, and d are recorded, but b is not recorded.
 
 ## Requirements to reproduce
 
-To run this repro, the commands shown below must be installed.
+The commands shown below must be installed.
 
   - make
   - wget
   - docker.io or docker-ce
   - docker-compose-plugin or docker-compose-v2
 
-And, since will be using the docker CLI, expected that add user to docker group.
+And, add the user to docker group for using docker CLI.
 ```
   $ sudo gpasswd -a <user> docker
 ```
-After adding a user to docker group, the user may need to logout once.
+After adding the user to docker group, the user may need to logout once.
 
 ## Steps to reproduce
 
@@ -111,7 +111,7 @@ http://<your ip>:16686
 Probably, the span of the consumer receive operation from kafka is not recorded in jaeger.
 
   1. `producer.service sample-topic publish`
-  2. Span of receive operation is not recorded
+  2. **Span of receive operation is not recorded**
   3. `spark-consumer.service GET`
   4. `nginx-opentracing.service nginx-opentracing`
 
